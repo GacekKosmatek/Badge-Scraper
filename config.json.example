@@ -1,0 +1,5 @@
+{
+    "webhook": "Discord webhook URL",
+    "batchSize": 100000,
+    "threadLimit": 3072
+}
