@@ -24,7 +24,6 @@ with open("config.json", "r") as f:
     THREAD_LIMIT = config["threadLimit"]
     BATCH_SIZE = config["batchSize"]
     WEBHOOK = config["webhook"]
-    MESSAGE_ID = config["messageId"]
 
 def convert_seconds(seconds: int):
     minutes, remaining_seconds = divmod(seconds, 60)
@@ -43,12 +42,12 @@ def convert_seconds(seconds: int):
 async def main():
     i = 0
     semaphore = asyncio.Semaphore(THREAD_LIMIT)
+    message = None
     
     async with aiohttp.ClientSession() as session:
         webhook = discord.Webhook.from_url(WEBHOOK, session=session)
         start_time = 0
         while True:
-            print("counting")
             start_time = int(time.perf_counter())
             start = i * BATCH_SIZE + STARTER
             end = (i + 1) * BATCH_SIZE + STARTER
@@ -60,7 +59,6 @@ async def main():
             ]
             await asyncio.gather(*tasks)
             database.commit()
-            print("counted POG")
             
             embed = discord.Embed(title="Badge Scraper", timestamp=datetime.now(), color=0x2B2D31)
             embed.add_field(name="Badges Found", value=len(database.query(Badge).all()), inline=True)
@@ -70,11 +68,14 @@ async def main():
             embed.add_field(name="To", value=end, inline=True)
             embed.add_field(name="Badges Checked", value=end - STARTER, inline=True)
             embed.set_footer(text=f"{BATCH_SIZE / 1000}k badges scraped in {convert_seconds(int(time.perf_counter()) - start_time)}", icon_url="https://media.discordapp.net/stickers/863848295629324299.webp")
-            await webhook.edit_message(MESSAGE_ID, embed=embed)
+            if not message:
+                message = (await webhook.send(embed=embed, wait=True)).id
+            else:
+                await webhook.edit_message(message, embed=embed)
+            
             with open("last_badge", "w") as f:
                 f.write(str(STARTER))
             i += 1
-            print(f"checked {BATCH_SIZE} badges")
 
 
 async def checkBadge(semaphore: asyncio.Semaphore, session: aiohttp.ClientSession, id: int):
