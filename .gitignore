@@ -226,3 +226,5 @@ $RECYCLE.BIN/
 badges.db
 config.json
 .vscode
+last_badge
+badges.session.sql

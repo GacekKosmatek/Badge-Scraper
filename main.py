@@ -48,35 +48,36 @@ async def main():
         webhook = discord.Webhook.from_url(WEBHOOK, session=session)
         start_time = 0
         while True:
-            start_time = int(time.perf_counter())
-            start = i * BATCH_SIZE + STARTER
-            end = (i + 1) * BATCH_SIZE + STARTER
-            
-            tasks = [
-                asyncio.create_task(
-                    checkBadge(semaphore, session, i)
-                ) for i in range(start, end, 1)
-            ]
-            await asyncio.gather(*tasks)
-            database.commit()
-            
-            embed = discord.Embed(title="Badge Scraper", timestamp=datetime.now(), color=0x2B2D31)
-            embed.add_field(name="Badges Found", value=len(database.query(Badge).all()), inline=True)
-            embed.add_field(name="Paid Badges Found", value=len(database.query(Badge).filter(Badge.paid == True).all()), inline=True)
-            embed.add_field(name="Legacy Badges Found", value=len(database.query(Badge).filter(Badge.legacy == True).all()), inline=True)
-            embed.add_field(name="From", value=STARTER, inline=True)
-            embed.add_field(name="To", value=end, inline=True)
-            embed.add_field(name="Badges Checked", value=end - STARTER, inline=True)
-            embed.set_footer(text=f"{BATCH_SIZE / 1000}k badges scraped in {convert_seconds(int(time.perf_counter()) - start_time)}", icon_url="https://media.discordapp.net/stickers/863848295629324299.webp")
-            if not message:
-                message = (await webhook.send(embed=embed, wait=True)).id
-            else:
-                await webhook.edit_message(message, embed=embed)
-            
-            with open("last_badge", "w") as f:
-                f.write(str(STARTER))
-            i += 1
+            try:
+                start_time = int(time.perf_counter())
+                start = i * BATCH_SIZE + STARTER
+                end = (i + 1) * BATCH_SIZE + STARTER
 
+                tasks = [
+                    asyncio.create_task(
+                        checkBadge(semaphore, session, i)
+                    ) for i in range(start, end, 1)
+                ]
+                await asyncio.gather(*tasks)
+
+                embed = discord.Embed(title="Badge Scraper", timestamp=datetime.now(), color=0x2B2D31)
+                embed.add_field(name="Badges Found", value=len(database.query(Badge).all()), inline=True)
+                embed.add_field(name="Paid Badges Found", value=len(database.query(Badge).filter(Badge.paid == True).all()), inline=True)
+                embed.add_field(name="Legacy Badges Found", value=len(database.query(Badge).filter(Badge.legacy == True).all()), inline=True)
+                embed.add_field(name="From", value=STARTER, inline=True)
+                embed.add_field(name="To", value=end, inline=True)
+                embed.add_field(name="Badges Checked", value=end - STARTER, inline=True)
+                embed.set_footer(text=f"{BATCH_SIZE / 1000}k badges scraped in {convert_seconds(int(time.perf_counter()) - start_time)}", icon_url="https://media.discordapp.net/stickers/863848295629324299.webp")
+                if not message:
+                    message = (await webhook.send(embed=embed, wait=True)).id
+                else:
+                    await webhook.edit_message(message, embed=embed)
+
+                with open("last_badge", "w") as f:
+                    f.write(str(end + 1))
+                i += 1
+            except (KeyboardInterrupt, SystemExit): break
+            else: database.commit()
 
 async def checkBadge(semaphore: asyncio.Semaphore, session: aiohttp.ClientSession, id: int):
     async with semaphore:
