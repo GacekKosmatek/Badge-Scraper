@@ -19,6 +19,8 @@ DEFAULT_PARAMS = { "limit": 100, "sortOrder": "Asc" }
 database = SessionLocal()
 Base.metadata.create_all(bind=engine)
 
+currentYear = None
+
 with open("config.json", "r") as f:
     config = json.load(f)
     THREAD_LIMIT = config["threadLimit"]
@@ -60,7 +62,7 @@ async def main():
                 ]
                 await asyncio.gather(*tasks)
 
-                embed = discord.Embed(title="Badge Scraper", timestamp=datetime.now(), color=0x2B2D31)
+                embed = discord.Embed(title="Badge Scraper", description=f"**Current Year** - {currentYear}" if currentYear else None, timestamp=datetime.now(), color=0x2B2D31)
                 embed.add_field(name="Badges Found", value=len(database.query(Badge).all()), inline=True)
                 embed.add_field(name="Paid Badges Found", value=len(database.query(Badge).filter(Badge.paid == True).all()), inline=True)
                 embed.add_field(name="Legacy Badges Found", value=len(database.query(Badge).filter(Badge.legacy == True).all()), inline=True)
@@ -80,6 +82,7 @@ async def main():
             else: database.commit()
 
 async def checkBadge(semaphore: asyncio.Semaphore, session: aiohttp.ClientSession, id: int):
+    global currentYear
     async with semaphore:
         while True:
             try:
@@ -87,6 +90,7 @@ async def checkBadge(semaphore: asyncio.Semaphore, session: aiohttp.ClientSessio
                     if (r.status == 200):
                         resp = await r.json()
                         created_at = datetime.fromisoformat(resp["created"])
+                        if ((currentYear or 0) < created_at.year): currentYear = created_at.year
                         legacy = False
                         paid = False
                         if created_at.timestamp() < FREE_BADGE_UPDATE:
